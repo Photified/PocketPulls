@@ -1,4 +1,4 @@
-// 1. Expert Override List using Set Names to avoid ID mismatch bugs
+// 1. Expert Override List
 const chaseOverrides = {
     "Ascended Heroes": ["284", "276", "290", "294", "281"], 
     "Perfect Order": ["124", "123", "122", "121", "120"],
@@ -7,11 +7,11 @@ const chaseOverrides = {
 
 // 2. URL Overrides for missing TCGPlayer links (Bypassed once price > 0)
 const urlOverrides = {
-    "284": "https://www.tcgplayer.com/product/676096/pokemon-me-ascended-heroes-mega-gengar-ex-284-217", // Gengar
-    "276": "https://www.tcgplayer.com/product/676088/pokemon-me-ascended-heroes-pikachu-ex-276-217",   // Pikachu
-    "290": "https://www.tcgplayer.com/product/676102/pokemon-me-ascended-heroes-mega-dragonite-ex-290-217", // Dragonite
-    "294": "https://www.tcgplayer.com/product/676106/pokemon-me-ascended-heroes-mega-charizard-y-ex-294-217", // Charizard
-    "281": "https://www.tcgplayer.com/product/676093/pokemon-me-ascended-heroes-team-rockets-mewtwo-ex-281-217"  // Mewtwo
+    "284": "https://www.tcgplayer.com/product/676096/pokemon-me-ascended-heroes-mega-gengar-ex-284-217", 
+    "276": "https://www.tcgplayer.com/product/676088/pokemon-me-ascended-heroes-pikachu-ex-276-217",   
+    "290": "https://www.tcgplayer.com/product/676102/pokemon-me-ascended-heroes-mega-dragonite-ex-290-217", 
+    "294": "https://www.tcgplayer.com/product/676106/pokemon-me-ascended-heroes-mega-charizard-y-ex-294-217", 
+    "281": "https://www.tcgplayer.com/product/676093/pokemon-me-ascended-heroes-team-rockets-mewtwo-ex-281-217"  
 };
 
 // 3. Master Odds Library
@@ -38,7 +38,7 @@ const rarityScore = {
     'Rare': 3
 };
 
-// 5. Load the Stonks Database from LocalStorage
+// 5. Load the Stonks Database
 const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
 
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
@@ -129,9 +129,13 @@ async function openSetView(set) {
         const cards = await fetchAllCards(set.id);
 
         const sortedCards = cards.sort((a, b) => {
+            // FIX: Slice off the "/217" from the card number string so "290/217" becomes "290"
+            const baseNumA = a.number.toString().split('/')[0];
+            const baseNumB = b.number.toString().split('/')[0];
+
             const manualList = chaseOverrides[set.name] || [];
-            const manualPosA = manualList.indexOf(a.number);
-            const manualPosB = manualList.indexOf(b.number);
+            const manualPosA = manualList.indexOf(baseNumA);
+            const manualPosB = manualList.indexOf(baseNumB);
 
             if (manualPosA !== -1 || manualPosB !== -1) {
                 if (manualPosA !== -1 && manualPosB !== -1) return manualPosA - manualPosB;
@@ -142,8 +146,8 @@ async function openSetView(set) {
             const priceB = getHighestPrice(b);
             if (priceA > 0 || priceB > 0) return priceB - priceA;
 
-            const isSecretA = parseInt(a.number) > set.printedTotal;
-            const isSecretB = parseInt(b.number) > set.printedTotal;
+            const isSecretA = parseInt(baseNumA) > set.printedTotal;
+            const isSecretB = parseInt(baseNumB) > set.printedTotal;
             if (isSecretA && !isSecretB) return -1;
             if (!isSecretA && isSecretB) return 1;
 
@@ -193,14 +197,18 @@ function renderChases(cards) {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
         
-        // SMART URL ENGINE: Manual Override -> API Link -> Search Fallback
+        // FIX: Extract base number to match our dictionary accurately
+        const baseNum = card.number.toString().split('/')[0];
+
+        // SMART URL ENGINE
         let tcgUrl = '';
-        if (price === 0 && urlOverrides[card.number]) {
-            tcgUrl = urlOverrides[card.number];
+        if (price === 0 && urlOverrides[baseNum]) {
+            tcgUrl = urlOverrides[baseNum];
         } else if (card.tcgplayer && card.tcgplayer.url) {
             tcgUrl = card.tcgplayer.url;
         } else {
-            tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + card.number)}`;
+            // FIX: Search "Dragonite 290" instead of "Dragonite 290/217" so TCGPlayer doesn't crash
+            tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + baseNum)}`;
         }
 
         // Convert apostrophes so they don't break the HTML onclick string
@@ -237,11 +245,6 @@ function renderChases(cards) {
 function openLightbox(url) { document.getElementById('lightbox-image').src = url; document.getElementById('lightbox').style.display = 'flex'; }
 function closeLightbox() { document.getElementById('lightbox').style.display = 'none'; }
 
-
-// ==========================================
-// PWA, SERVICE WORKER, AND MODAL LOGIC
-// ==========================================
-
 // Register Service Worker
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -275,7 +278,6 @@ installBtn.addEventListener('click', async () => {
     }
 });
 
-// Detect iOS
 const isIos = () => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     return /iphone|ipad|ipod/.test(userAgent);
