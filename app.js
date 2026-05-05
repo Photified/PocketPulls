@@ -5,7 +5,7 @@ const chaseOverrides = {
     "Phantasmal Flames": ["251", "250", "249", "248", "247"]
 };
 
-// 2. URL Overrides for missing TCGPlayer links (Bypassed once price > 0)
+// 2. URL Overrides for missing TCGPlayer links
 const urlOverrides = {
     "284": "https://www.tcgplayer.com/product/676096/pokemon-me-ascended-heroes-mega-gengar-ex-284-217", 
     "276": "https://www.tcgplayer.com/product/676088/pokemon-me-ascended-heroes-pikachu-ex-276-217",   
@@ -41,7 +41,7 @@ const rarityScore = {
 // 5. Load the Stonks Database
 const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
 
-// 6. Memory Cache (Speeds up return visits)
+// 6. Memory Cache
 const cardCache = {}; 
 
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
@@ -127,7 +127,6 @@ async function openSetView(set) {
 
     const chaseContainer = document.getElementById('chase-container');
     
-    // Check Cache First!
     if (cardCache[set.id]) {
         chaseContainer.innerHTML = ''; 
         processAndSortCards(cardCache[set.id], set);
@@ -138,7 +137,7 @@ async function openSetView(set) {
 
     try {
         const cards = await fetchAllCards(set.id);
-        cardCache[set.id] = cards; // Save to Cache
+        cardCache[set.id] = cards;
         processAndSortCards(cards, set);
     } catch (error) { console.error(error); }
 }
@@ -225,6 +224,7 @@ function renderChases(cards) {
         let trendHtml = '';
         const pastPrice = savedPrices[card.id];
 
+        // This is the logic that powers the Baseline and Holding icons!
         if (price > 0) {
             if (pastPrice > 0) {
                 const difference = price - pastPrice;
@@ -257,7 +257,7 @@ function renderChases(cards) {
 function openLightbox(url) { document.getElementById('lightbox-image').src = url; document.getElementById('lightbox').style.display = 'flex'; }
 function closeLightbox() { document.getElementById('lightbox').style.display = 'none'; }
 
-// Register Service Worker
+// PWA & Modals
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')
@@ -266,11 +266,9 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Gear Modal Toggles
 document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
 document.getElementById('close-settings').onclick = () => document.getElementById('settings-modal').style.display = 'none';
 
-// Smart PWA Install Prompt
 let deferredPrompt;
 const installBtn = document.getElementById('install-btn');
 const iosMsg = document.getElementById('ios-install-msg');
