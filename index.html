@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pocket Pulls</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo.png">
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
 </head>
 <body>
     <header class="top-bar">
         <h1 class="logo-text">Pocket Pulls</h1>
+        <button id="settings-btn" class="gear-btn" aria-label="Settings">⚙️</button>
     </header>
 
     <div class="app-container">
@@ -39,6 +42,22 @@
 
     <div id="lightbox" class="lightbox" onclick="closeLightbox()">
         <img id="lightbox-image" src="" alt="Expanded Card">
+    </div>
+
+    <div id="settings-modal" class="lightbox">
+        <div class="modal-card">
+            <h2 class="section-title" style="margin-bottom: 10px;">Settings & Info</h2>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">
+                <strong>Pocket Pulls</strong> tracks live TCGPlayer market data and calculates the momentum of your chases.
+            </p>
+            
+            <button id="install-btn" class="btn-install hidden">⬇️ Install App to Phone</button>
+            <p id="ios-install-msg" class="hidden install-help">
+                <strong>To install on iOS:</strong><br>Tap Share <span style="font-size: 1.2rem;">⬆️</span> on your browser menu and select <em>"Add to Home Screen"</em>.
+            </p>
+            
+            <button id="close-settings" class="btn-back" style="margin-top: 15px; width: 100%;">Close</button>
+        </div>
     </div>
 
     <script src="app.js"></script>

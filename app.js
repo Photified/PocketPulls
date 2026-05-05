@@ -1,6 +1,6 @@
-// 1. Expert Override List using Set Names to avoid ID mismatch bugs
+// 1. Expert Override List
 const chaseOverrides = {
-    "Ascended Heroes": ["284", "276", "290", "294", "281"], // Gengar, Pikachu, Dragonite, Charizard, Mewtwo
+    "Ascended Heroes": ["284", "276", "290", "294", "281"], 
     "Perfect Order": ["124", "123", "122", "121", "120"],
     "Phantasmal Flames": ["251", "250", "249", "248", "247"]
 };
@@ -28,6 +28,9 @@ const rarityScore = {
     'Rare Holo': 4,
     'Rare': 3
 };
+
+// 4. Load the Stonks Database from LocalStorage
+const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
 
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
 
@@ -90,7 +93,6 @@ async function loadSets() {
     } catch (error) { console.error(error); }
 }
 
-// Fetches every card in the set
 async function fetchAllCards(setId, page = 1, allCards = []) {
     const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250`);
     const data = await response.json();
@@ -118,7 +120,6 @@ async function openSetView(set) {
         const cards = await fetchAllCards(set.id);
 
         const sortedCards = cards.sort((a, b) => {
-            // STEP 1: Check for Manual Overrides by Set Name
             const manualList = chaseOverrides[set.name] || [];
             const manualPosA = manualList.indexOf(a.number);
             const manualPosB = manualList.indexOf(b.number);
@@ -128,18 +129,15 @@ async function openSetView(set) {
                 return manualPosA !== -1 ? -1 : 1;
             }
 
-            // STEP 2: Use prices if they exist
             const priceA = getHighestPrice(a);
             const priceB = getHighestPrice(b);
             if (priceA > 0 || priceB > 0) return priceB - priceA;
 
-            // STEP 3: Secret Rare Bonus
             const isSecretA = parseInt(a.number) > set.printedTotal;
             const isSecretB = parseInt(b.number) > set.printedTotal;
             if (isSecretA && !isSecretB) return -1;
             if (!isSecretA && isSecretB) return 1;
 
-            // STEP 4: Rarity Score Fallback
             const scoreA = rarityScore[a.rarity] || 0;
             const scoreB = rarityScore[b.rarity] || 0;
             return scoreB - scoreA;
@@ -181,26 +179,92 @@ function getHighestPrice(card) {
 function renderChases(cards) {
     const container = document.getElementById('chase-container');
     container.innerHTML = ''; 
+    
     cards.forEach(card => {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
-        
-        // Extract the TCGPlayer URL. Fallback to '#' if the API doesn't have it.
         const tcgUrl = card.tcgplayer && card.tcgplayer.url ? card.tcgplayer.url : '#';
+
+        // STONKS LOGIC: Check saved price vs live price
+        let trendHtml = '';
+        const pastPrice = savedPrices[card.id];
+
+        if (price > 0 && pastPrice > 0) {
+            const difference = price - pastPrice;
+            if (difference > 0) {
+                trendHtml = `<div class="trend-pill trend-up">+$${difference.toFixed(2)} 📈</div>`;
+            } else if (difference < 0) {
+                trendHtml = `<div class="trend-pill trend-down">-$${Math.abs(difference).toFixed(2)} 📉</div>`;
+            }
+        }
+
+        // Save current price for next time
+        if (price > 0) savedPrices[card.id] = price;
 
         const cardItem = document.createElement('div');
         cardItem.className = 'card-item';
-        
-        // Attached the URL via an onclick event to the price tag 
         cardItem.innerHTML = `
             <img class="chase-thumbnail" src="${card.images.small}" onclick="openLightbox('${card.images.large}')">
             <div class="price-tag" onclick="window.open('${tcgUrl}', '_blank')" title="View Live on TCGPlayer">${priceString}</div>
+            ${trendHtml}
         `;
         container.appendChild(cardItem);
     });
+
+    // Update LocalStorage silently
+    localStorage.setItem('pocketPullsPrices', JSON.stringify(savedPrices));
 }
 
 function openLightbox(url) { document.getElementById('lightbox-image').src = url; document.getElementById('lightbox').style.display = 'flex'; }
 function closeLightbox() { document.getElementById('lightbox').style.display = 'none'; }
+
+
+// ==========================================
+// PWA, SERVICE WORKER, AND MODAL LOGIC
+// ==========================================
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker Registered'))
+            .catch(err => console.log('SW Registration Failed:', err));
+    });
+}
+
+// Gear Modal Toggles
+document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
+document.getElementById('close-settings').onclick = () => document.getElementById('settings-modal').style.display = 'none';
+
+// Smart PWA Install Prompt
+let deferredPrompt;
+const installBtn = document.getElementById('install-btn');
+const iosMsg = document.getElementById('ios-install-msg');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.classList.remove('hidden');
+});
+
+installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') installBtn.classList.add('hidden');
+        deferredPrompt = null;
+    }
+});
+
+// Detect iOS for specific install instructions
+const isIos = () => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    return /iphone|ipad|ipod/.test(userAgent);
+};
+const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+if (isIos() && !isInStandaloneMode()) {
+    iosMsg.classList.remove('hidden');
+}
 
 loadSets();
