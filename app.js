@@ -41,6 +41,9 @@ const rarityScore = {
 // 5. Load the Stonks Database
 const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
 
+// 6. Memory Cache (Speeds up return visits)
+const cardCache = {}; 
+
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
 
 async function loadSets() {
@@ -123,41 +126,52 @@ async function openSetView(set) {
     renderOdds(set.id, set.series); 
 
     const chaseContainer = document.getElementById('chase-container');
+    
+    // Check Cache First!
+    if (cardCache[set.id]) {
+        chaseContainer.innerHTML = ''; 
+        processAndSortCards(cardCache[set.id], set);
+        return;
+    }
+
     chaseContainer.innerHTML = `<div class="loader-container"><div class="pokeball-spinner"></div><div class="loader-text">Loading All Cards...</div></div>`;
 
     try {
         const cards = await fetchAllCards(set.id);
-
-        const sortedCards = cards.sort((a, b) => {
-            // FIX: Slice off the "/217" from the card number string so "290/217" becomes "290"
-            const baseNumA = a.number.toString().split('/')[0];
-            const baseNumB = b.number.toString().split('/')[0];
-
-            const manualList = chaseOverrides[set.name] || [];
-            const manualPosA = manualList.indexOf(baseNumA);
-            const manualPosB = manualList.indexOf(baseNumB);
-
-            if (manualPosA !== -1 || manualPosB !== -1) {
-                if (manualPosA !== -1 && manualPosB !== -1) return manualPosA - manualPosB;
-                return manualPosA !== -1 ? -1 : 1;
-            }
-
-            const priceA = getHighestPrice(a);
-            const priceB = getHighestPrice(b);
-            if (priceA > 0 || priceB > 0) return priceB - priceA;
-
-            const isSecretA = parseInt(baseNumA) > set.printedTotal;
-            const isSecretB = parseInt(baseNumB) > set.printedTotal;
-            if (isSecretA && !isSecretB) return -1;
-            if (!isSecretA && isSecretB) return 1;
-
-            const scoreA = rarityScore[a.rarity] || 0;
-            const scoreB = rarityScore[b.rarity] || 0;
-            return scoreB - scoreA;
-        });
-
-        renderChases(sortedCards.slice(0, 5));
+        cardCache[set.id] = cards; // Save to Cache
+        processAndSortCards(cards, set);
     } catch (error) { console.error(error); }
+}
+
+function processAndSortCards(cards, set) {
+    const sortedCards = cards.sort((a, b) => {
+        const baseNumA = a.number.toString().split('/')[0];
+        const baseNumB = b.number.toString().split('/')[0];
+
+        const manualList = chaseOverrides[set.name] || [];
+        const manualPosA = manualList.indexOf(baseNumA);
+        const manualPosB = manualList.indexOf(baseNumB);
+
+        if (manualPosA !== -1 || manualPosB !== -1) {
+            if (manualPosA !== -1 && manualPosB !== -1) return manualPosA - manualPosB;
+            return manualPosA !== -1 ? -1 : 1;
+        }
+
+        const priceA = getHighestPrice(a);
+        const priceB = getHighestPrice(b);
+        if (priceA > 0 || priceB > 0) return priceB - priceA;
+
+        const isSecretA = parseInt(baseNumA) > set.printedTotal;
+        const isSecretB = parseInt(baseNumB) > set.printedTotal;
+        if (isSecretA && !isSecretB) return -1;
+        if (!isSecretA && isSecretB) return 1;
+
+        const scoreA = rarityScore[a.rarity] || 0;
+        const scoreB = rarityScore[b.rarity] || 0;
+        return scoreB - scoreA;
+    });
+
+    renderChases(sortedCards.slice(0, 5));
 }
 
 function renderOdds(setId, seriesName) {
@@ -196,38 +210,36 @@ function renderChases(cards) {
     cards.forEach(card => {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
-        
-        // FIX: Extract base number to match our dictionary accurately
         const baseNum = card.number.toString().split('/')[0];
 
-        // SMART URL ENGINE
         let tcgUrl = '';
         if (price === 0 && urlOverrides[baseNum]) {
             tcgUrl = urlOverrides[baseNum];
         } else if (card.tcgplayer && card.tcgplayer.url) {
             tcgUrl = card.tcgplayer.url;
         } else {
-            // FIX: Search "Dragonite 290" instead of "Dragonite 290/217" so TCGPlayer doesn't crash
             tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + baseNum)}`;
         }
-
-        // Convert apostrophes so they don't break the HTML onclick string
         tcgUrl = tcgUrl.replace(/'/g, "%27");
 
-        // STONKS LOGIC
         let trendHtml = '';
         const pastPrice = savedPrices[card.id];
 
-        if (price > 0 && pastPrice > 0) {
-            const difference = price - pastPrice;
-            if (difference > 0) {
-                trendHtml = `<div class="trend-pill trend-up">+$${difference.toFixed(2)} 📈</div>`;
-            } else if (difference < 0) {
-                trendHtml = `<div class="trend-pill trend-down">-$${Math.abs(difference).toFixed(2)} 📉</div>`;
+        if (price > 0) {
+            if (pastPrice > 0) {
+                const difference = price - pastPrice;
+                if (difference > 0) {
+                    trendHtml = `<div class="trend-pill trend-up">+$${difference.toFixed(2)} 📈</div>`;
+                } else if (difference < 0) {
+                    trendHtml = `<div class="trend-pill trend-down">-$${Math.abs(difference).toFixed(2)} 📉</div>`;
+                } else {
+                    trendHtml = `<div class="trend-pill trend-flat">Holding ➖</div>`;
+                }
+            } else {
+                trendHtml = `<div class="trend-pill trend-flat">Baseline 📊</div>`;
             }
+            savedPrices[card.id] = price;
         }
-
-        if (price > 0) savedPrices[card.id] = price;
 
         const cardItem = document.createElement('div');
         cardItem.className = 'card-item';

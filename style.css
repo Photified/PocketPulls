@@ -46,6 +46,7 @@ body { font-family: 'Nunito', sans-serif; background-color: #f4f4f9; color: #333
 .trend-pill { font-size: 0.75rem; font-weight: 900; padding: 3px 8px; border-radius: 12px; margin-top: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .trend-up { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 .trend-down { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.trend-flat { background-color: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
 
 .lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
 #lightbox-image { max-width: 95%; max-height: 95%; border-radius: 15px; }
