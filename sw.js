@@ -1,10 +1,12 @@
-const CACHE_NAME = 'pocket-pulls-v1';
+const CACHE_NAME = 'pocket-pulls-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './style.css',
     './app.js',
-    './manifest.json'
+    './manifest.json',
+    './logo.svg',
+    './logo.png'
 ];
 
 // Install event: Cache files
