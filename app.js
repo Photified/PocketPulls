@@ -184,10 +184,13 @@ function renderChases(cards) {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
         
-        // SMART URL FALLBACK
-        const tcgUrl = (card.tcgplayer && card.tcgplayer.url) 
+        // SMART URL FALLBACK: Added '&ProductTypeName=Cards' to filter out sealed product
+        let tcgUrl = (card.tcgplayer && card.tcgplayer.url) 
             ? card.tcgplayer.url 
-            : `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name + ' ' + card.number)}`;
+            : `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + card.number)}`;
+
+        // THE MEWTWO FIX: Convert apostrophes so they don't break the HTML onclick string
+        tcgUrl = tcgUrl.replace(/'/g, "%27");
 
         // STONKS LOGIC
         let trendHtml = '';
