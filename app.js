@@ -1,4 +1,4 @@
-// 1. Expert Override List
+// 1. Expert Override List using Set Names to avoid ID mismatch bugs
 const chaseOverrides = {
     "Ascended Heroes": ["284", "276", "290", "294", "281"], 
     "Perfect Order": ["124", "123", "122", "121", "120"],
@@ -183,9 +183,13 @@ function renderChases(cards) {
     cards.forEach(card => {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
-        const tcgUrl = card.tcgplayer && card.tcgplayer.url ? card.tcgplayer.url : '#';
+        
+        // SMART URL FALLBACK
+        const tcgUrl = (card.tcgplayer && card.tcgplayer.url) 
+            ? card.tcgplayer.url 
+            : `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name + ' ' + card.number)}`;
 
-        // STONKS LOGIC: Check saved price vs live price
+        // STONKS LOGIC
         let trendHtml = '';
         const pastPrice = savedPrices[card.id];
 
@@ -198,20 +202,18 @@ function renderChases(cards) {
             }
         }
 
-        // Save current price for next time
         if (price > 0) savedPrices[card.id] = price;
 
         const cardItem = document.createElement('div');
         cardItem.className = 'card-item';
         cardItem.innerHTML = `
             <img class="chase-thumbnail" src="${card.images.small}" onclick="openLightbox('${card.images.large}')">
-            <div class="price-tag" onclick="window.open('${tcgUrl}', '_blank')" title="View Live on TCGPlayer">${priceString}</div>
+            <div class="price-tag" onclick="window.open('${tcgUrl}', '_blank')" title="View on TCGPlayer">${priceString}</div>
             ${trendHtml}
         `;
         container.appendChild(cardItem);
     });
 
-    // Update LocalStorage silently
     localStorage.setItem('pocketPullsPrices', JSON.stringify(savedPrices));
 }
 
@@ -256,7 +258,7 @@ installBtn.addEventListener('click', async () => {
     }
 });
 
-// Detect iOS for specific install instructions
+// Detect iOS
 const isIos = () => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     return /iphone|ipad|ipod/.test(userAgent);
