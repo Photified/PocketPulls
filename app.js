@@ -38,17 +38,21 @@ const rarityScore = {
     'Rare': 3
 };
 
-// 5. Load the Stonks Database
-const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
+// 5. THE API KEY (Paste yours right here between the quotes)
+const API_KEY = "c7f8ecf9-8793-4fd6-a929-2282bf5fb09f"; 
 
-// 6. Memory Cache
+// 6. Load the Stonks Database & Memory Cache
+const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
 const cardCache = {}; 
 
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
 
 async function loadSets() {
     try {
-        const response = await fetch(setsApiUrl);
+        // INJECTED KEY HERE
+        const response = await fetch(setsApiUrl, {
+            headers: { 'X-Api-Key': API_KEY }
+        });
         const data = await response.json();
         const sets = data.data;
         const container = document.getElementById('sets-container');
@@ -106,7 +110,10 @@ async function loadSets() {
 }
 
 async function fetchAllCards(setId, page = 1, allCards = []) {
-    const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250`);
+    // INJECTED KEY HERE
+    const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250`, {
+        headers: { 'X-Api-Key': API_KEY }
+    });
     const data = await response.json();
     allCards.push(...data.data);
     if (data.data.length === 250) {
@@ -224,7 +231,6 @@ function renderChases(cards) {
         let trendHtml = '';
         const pastPrice = savedPrices[card.id];
 
-        // This is the logic that powers the Baseline and Holding icons!
         if (price > 0) {
             if (pastPrice > 0) {
                 const difference = price - pastPrice;
