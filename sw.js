@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pocket-pulls-v5';
+const CACHE_NAME = 'pocket-pulls-v6';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

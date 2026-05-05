@@ -5,14 +5,23 @@ const chaseOverrides = {
     "Phantasmal Flames": ["251", "250", "249", "248", "247"]
 };
 
-// 2. Master Odds Library
+// 2. URL Overrides for missing TCGPlayer links (Bypassed once price > 0)
+const urlOverrides = {
+    "284": "https://www.tcgplayer.com/product/676096/pokemon-me-ascended-heroes-mega-gengar-ex-284-217", // Gengar
+    "276": "https://www.tcgplayer.com/product/676088/pokemon-me-ascended-heroes-pikachu-ex-276-217",   // Pikachu
+    "290": "https://www.tcgplayer.com/product/676102/pokemon-me-ascended-heroes-mega-dragonite-ex-290-217", // Dragonite
+    "294": "https://www.tcgplayer.com/product/676106/pokemon-me-ascended-heroes-mega-charizard-y-ex-294-217", // Charizard
+    "281": "https://www.tcgplayer.com/product/676093/pokemon-me-ascended-heroes-team-rockets-mewtwo-ex-281-217"  // Mewtwo
+};
+
+// 3. Master Odds Library
 const setOdds = {
     "sv3pt5": { ir: 12, ur: 15, sir: 32, gold: 50 }, 
     "Scarlet & Violet": { ir: 13, ur: 15, sir: 86, gold: 150 },
     "Mega Evolution": { ir: 10, ur: 12, sir: 70, gold: 120 }
 };
 
-// 3. Rarity Ranking
+// 4. Rarity Ranking
 const rarityScore = {
     'Special Illustration Rare': 15,
     'Mega Hyper Rare': 14,
@@ -29,7 +38,7 @@ const rarityScore = {
     'Rare': 3
 };
 
-// 4. Load the Stonks Database from LocalStorage
+// 5. Load the Stonks Database from LocalStorage
 const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
 
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
@@ -184,12 +193,17 @@ function renderChases(cards) {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
         
-        // SMART URL FALLBACK: Added '&ProductTypeName=Cards' to filter out sealed product
-        let tcgUrl = (card.tcgplayer && card.tcgplayer.url) 
-            ? card.tcgplayer.url 
-            : `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + card.number)}`;
+        // SMART URL ENGINE: Manual Override -> API Link -> Search Fallback
+        let tcgUrl = '';
+        if (price === 0 && urlOverrides[card.number]) {
+            tcgUrl = urlOverrides[card.number];
+        } else if (card.tcgplayer && card.tcgplayer.url) {
+            tcgUrl = card.tcgplayer.url;
+        } else {
+            tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + card.number)}`;
+        }
 
-        // THE MEWTWO FIX: Convert apostrophes so they don't break the HTML onclick string
+        // Convert apostrophes so they don't break the HTML onclick string
         tcgUrl = tcgUrl.replace(/'/g, "%27");
 
         // STONKS LOGIC
