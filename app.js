@@ -1,11 +1,13 @@
 /**
- * POCKET PULLS - MASTER ENGINE v12
- * Features: Era-Labeling, Community Odds, Memory Cache, 
- * URL Overrides, Manual Sorting, & LocalStorage Stonks.
+ * POCKET PULLS - PRO MASTER ENGINE v14
+ * * DESIGN PHILOSOPHY:
+ * 1. Zero Browser Bloat: No massive card data saved to disk.
+ * 2. High Performance: Uses RAM-based Memory Caching.
+ * 3. Complete Transparency: Every logic block is explicitly written out.
  */
 
 // --- 1. MANUAL CHASE OVERRIDES ---
-// Forces specific card numbers to the top 5 for new or unpriced sets.
+// Explicitly forces high-value cards to the top 5 for specific sets.
 const chaseOverrides = {
     "Ascended Heroes": ["284", "276", "290", "294", "281"], 
     "Perfect Order": ["124", "123", "122", "121", "120"],
@@ -13,7 +15,7 @@ const chaseOverrides = {
 };
 
 // --- 2. TCGPLAYER URL OVERRIDES ---
-// Fixes broken API links for brand new cards (Dragonite, Mewtwo, etc).
+// Hardcoded links for cards that have broken API data or search errors.
 const urlOverrides = {
     "284": "https://www.tcgplayer.com/product/676096/pokemon-me-ascended-heroes-mega-gengar-ex-284-217", 
     "276": "https://www.tcgplayer.com/product/676088/pokemon-me-ascended-heroes-pikachu-ex-276-217",   
@@ -22,24 +24,24 @@ const urlOverrides = {
     "281": "https://www.tcgplayer.com/product/676093/pokemon-me-ascended-heroes-team-rockets-mewtwo-ex-281-217"  
 };
 
-// --- 3. ERA-SPECIFIC CONFIGURATION ---
-// Community-sourced odds for Sword & Shield, Sun & Moon, and XY.
+// --- 3. ERA & ODDS CONFIGURATION ---
+// Community-sourced data for historical accuracy.
 const eraConfig = {
     "Scarlet & Violet": {
         labels: ["Illustration Rare", "Ultra Rare", "Spec. Illustration Rare", "Hyper Rare"],
         odds: { ir: 13, ur: 15, sir: 86, gold: 150 }
     },
     "Sword & Shield": {
-        labels: ["V / VMAX", "Full Art", "Alt Art / TG", "Secret Rare"], //
-        odds: { ir: 8, ur: 15, sir: 100, gold: 72 } //
+        labels: ["V / VMAX", "Full Art", "Alt Art / TG", "Secret Rare"],
+        odds: { ir: 8, ur: 15, sir: 100, gold: 72 }
     },
     "Sun & Moon": {
-        labels: ["GX Card", "Full Art", "Tag Team / Rainbow", "Secret Rare"], //
-        odds: { ir: 6, ur: 20, sir: 86, gold: 72 } //
+        labels: ["GX Card", "Full Art", "Tag Team / Rainbow", "Secret Rare"],
+        odds: { ir: 6, ur: 20, sir: 86, gold: 72 }
     },
     "XY Series": { 
-        labels: ["EX Card", "Mega EX", "Full Art", "Secret Rare"], //
-        odds: { ir: 6, ur: 15, sir: 36, gold: 72 } //
+        labels: ["EX Card", "Mega EX", "Full Art", "Secret Rare"],
+        odds: { ir: 6, ur: 15, sir: 36, gold: 72 }
     }
 };
 
@@ -48,7 +50,7 @@ const defaultEra = {
     odds: { ir: 12, ur: 36, sir: 72, gold: 144 }
 };
 
-// --- 4. RARITY RANKING (FOR AUTO-SORTING) ---
+// --- 4. RARITY SCORING (TIE-BREAKER SORTING) ---
 const rarityScore = {
     'Special Illustration Rare': 15, 'Mega Hyper Rare': 14, 'Hyper Rare': 13,
     'Mega Attack Rare': 12, 'Ultra Rare': 10, 'Illustration Rare': 9,
@@ -56,26 +58,34 @@ const rarityScore = {
     'Rare Holo VMAX': 6, 'Rare Holo V': 5, 'Rare Holo': 4, 'Rare': 3
 };
 
-// --- 5. GLOBAL STATE & API CONFIG ---
+// --- 5. GLOBAL APP STATE ---
 const API_KEY = "c7f8ecf9-8793-4fd6-a929-2282bf5fb09f"; 
-const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
-const cardCache = {}; // Memory cache for instant return-visits
 const setsApiUrl = 'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate';
 
-// --- 6. INITIALIZATION: LOAD ALL SETS ---
+// Memory Cache: Instant speed for the current session without bloating browser storage.
+const cardCache = {}; 
+
+// Stonks Database: Only stores tiny price numbers (Safe for LocalStorage).
+const savedPrices = JSON.parse(localStorage.getItem('pocketPullsPrices')) || {};
+
+// --- 6. CORE LOGIC: LOAD SET LIST ---
 async function loadSets() {
+    const setsContainer = document.getElementById('sets-container');
+    
     try {
         const response = await fetch(setsApiUrl, {
             headers: { 'X-Api-Key': API_KEY }
         });
         const data = await response.json();
-        const container = document.getElementById('sets-container');
-        container.innerHTML = ''; 
+        const allSets = data.data;
+
+        setsContainer.innerHTML = ''; 
 
         const seriesOrder = [];
         const seriesSets = {};
 
-        data.data.forEach(set => {
+        // Group sets by their Series (SV, SwSh, etc)
+        allSets.forEach(set => {
             if (!seriesOrder.includes(set.series)) {
                 seriesOrder.push(set.series); 
                 seriesSets[set.series] = [];
@@ -83,22 +93,23 @@ async function loadSets() {
             seriesSets[set.series].push(set);
         });
 
+        // Build the Accordion UI
         seriesOrder.forEach((seriesName, index) => {
             let baseSet = seriesSets[seriesName][0];
-            const eraSymbolUrl = baseSet.images.symbol;
-            const isOpen = index < 2;
+            const isOpen = index < 2; // Auto-open the newest 2 Eras
 
             const btn = document.createElement('button');
             btn.className = `accordion-btn ${isOpen ? 'active' : ''}`;
             btn.innerHTML = `
                 <div class="era-header-info">
-                    <img class="era-symbol" src="${eraSymbolUrl}"> 
+                    <img class="era-symbol" src="${baseSet.images.symbol}"> 
                     <span>${seriesName}</span>
                 </div>
                 <span class="arrow">${isOpen ? '▲' : '▼'}</span>`;
             
             const content = document.createElement('div');
             content.className = `accordion-content ${isOpen ? 'show' : ''}`;
+            
             const grid = document.createElement('div');
             grid.className = 'sets-grid';
 
@@ -111,8 +122,8 @@ async function loadSets() {
             });
 
             content.appendChild(grid);
-            container.appendChild(btn);
-            container.appendChild(content);
+            setsContainer.appendChild(btn);
+            setsContainer.appendChild(content);
 
             btn.onclick = function() {
                 this.classList.toggle('active');
@@ -120,24 +131,16 @@ async function loadSets() {
                 this.querySelector('.arrow').innerText = this.classList.contains('active') ? '▲' : '▼';
             };
         });
-    } catch (error) { console.error("Load Sets Error:", error); }
-}
 
-// --- 7. API FETCH: GET CARDS FOR SET ---
-async function fetchAllCards(setId, page = 1, allCards = []) {
-    const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250`, {
-        headers: { 'X-Api-Key': API_KEY }
-    });
-    const data = await response.json();
-    allCards.push(...data.data);
-    if (data.data.length === 250) {
-        return fetchAllCards(setId, page + 1, allCards);
+    } catch (error) {
+        console.error("API Error (Sets):", error);
+        setsContainer.innerHTML = `<p class="error">API Offline. Try again later.</p>`;
     }
-    return allCards;
 }
 
-// --- 8. VIEW CONTROLLER: OPEN SET ---
+// --- 7. CORE LOGIC: OPEN SET VIEW ---
 async function openSetView(set) {
+    // UI Transitions
     document.getElementById('home-view').classList.add('hidden');
     document.getElementById('set-view').classList.remove('hidden');
     document.getElementById('current-set-title').innerText = set.name;
@@ -146,112 +149,115 @@ async function openSetView(set) {
     symbolImg.src = set.images.symbol;
     symbolImg.classList.remove('hidden');
 
-    // Update terminology labels based on Era
-    renderOdds(set.series); 
-
-    const chaseContainer = document.getElementById('chase-container');
-    
-    // Check Memory Cache first for 0s load time
-    if (cardCache[set.id]) {
-        chaseContainer.innerHTML = ''; 
-        processAndSortCards(cardCache[set.id], set);
-        return;
-    }
-
-    chaseContainer.innerHTML = `
-        <div class="loader-container">
-            <div class="pokeball-spinner"></div>
-            <div class="loader-text">Loading All Cards...</div>
-        </div>`;
-
-    try {
-        const cards = await fetchAllCards(set.id);
-        cardCache[set.id] = cards; // Store in cache
-        processAndSortCards(cards, set);
-    } catch (error) { console.error("Fetch Cards Error:", error); }
-}
-
-// --- 9. ODDS ENGINE: ERA TERMINOLOGY ---
-function renderOdds(seriesName) {
-    const oddsBar = document.getElementById('odds-bar');
-    const seriesKey = seriesName.includes("XY") ? "XY Series" : seriesName;
+    // 1. Dynamic Era Terminology
+    const seriesKey = set.series.includes("XY") ? "XY Series" : set.series;
     const config = eraConfig[seriesKey] || defaultEra;
     
+    const oddsBar = document.getElementById('odds-bar');
     oddsBar.innerHTML = `
         <div class="odds-pill pill-ir"><span class="odds-label">${config.labels[0]}</span><span class="odds-value">1 in ${config.odds.ir}</span></div>
         <div class="odds-pill pill-ur"><span class="odds-label">${config.labels[1]}</span><span class="odds-value">1 in ${config.odds.ur}</span></div>
         <div class="odds-pill pill-sir"><span class="odds-label">${config.labels[2]}</span><span class="odds-value">1 in ${config.odds.sir}</span></div>
         <div class="odds-pill pill-gold"><span class="odds-label">${config.labels[3]}</span><span class="odds-value">1 in ${config.odds.gold}</span></div>
     `;
+
+    const chaseContainer = document.getElementById('chase-container');
+
+    // 2. Memory Cache Layer (Instant revisit speed)
+    if (cardCache[set.id]) {
+        console.log("Loading from Session Cache...");
+        renderChases(cardCache[set.id], set);
+        return;
+    }
+
+    // 3. API Download Layer
+    chaseContainer.innerHTML = `
+        <div class="loader-container">
+            <div class="pokeball-spinner"></div>
+            <div class="loader-text">Fetching Cards...</div>
+        </div>`;
+
+    try {
+        const fetchRecursive = async (id, page = 1, aggregate = []) => {
+            const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${id}&page=${page}&pageSize=250`, {
+                headers: { 'X-Api-Key': API_KEY }
+            });
+            const json = await res.json();
+            aggregate.push(...json.data);
+            
+            if (json.data.length === 250) {
+                return fetchRecursive(id, page + 1, aggregate);
+            }
+            return aggregate;
+        };
+
+        const allCards = await fetchRecursive(set.id);
+        cardCache[set.id] = allCards; // Save to RAM for this session
+        renderChases(allCards, set);
+
+    } catch (error) {
+        console.error("API Error (Cards):", error);
+        chaseContainer.innerHTML = `<p class="error">Data download failed.</p>`;
+    }
 }
 
-// --- 10. SORTING ENGINE: FIND THE TOP 5 ---
-function processAndSortCards(cards, set) {
-    const sortedCards = cards.sort((a, b) => {
-        // Fix for "290/217" format
-        const baseNumA = a.number.toString().split('/')[0];
-        const baseNumB = b.number.toString().split('/')[0];
+// --- 8. CORE LOGIC: SORT & RENDER CHASES ---
+function renderChases(cards, set) {
+    const chaseContainer = document.getElementById('chase-container');
+    chaseContainer.innerHTML = ''; 
 
-        // Level 1: Check Manual Chase Overrides
+    // 1. COMPLEX SORTING ENGINE
+    const sortedCards = cards.sort((cardA, cardB) => {
+        const baseNumA = cardA.number.toString().split('/')[0];
+        const baseNumB = cardB.number.toString().split('/')[0];
+
+        // Priority A: Check Manual Override Dictionary
         const manualList = chaseOverrides[set.name] || [];
-        const manualPosA = manualList.indexOf(baseNumA);
-        const manualPosB = manualList.indexOf(baseNumB);
+        const indexA = manualList.indexOf(baseNumA);
+        const indexB = manualList.indexOf(baseNumB);
 
-        if (manualPosA !== -1 || manualPosB !== -1) {
-            if (manualPosA !== -1 && manualPosB !== -1) return manualPosA - manualPosB;
-            return manualPosA !== -1 ? -1 : 1;
+        if (indexA !== -1 || indexB !== -1) {
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            return indexA !== -1 ? -1 : 1;
         }
 
-        // Level 2: Sort by Market Price
-        const priceA = getHighestPrice(a);
-        const priceB = getHighestPrice(b);
+        // Priority B: Sort by Market Price
+        const priceA = calculateHighestPrice(cardA);
+        const priceB = calculateHighestPrice(cardB);
         if (priceA > 0 || priceB > 0) return priceB - priceA;
 
-        // Level 3: Sort by Rarity Score
-        const scoreA = rarityScore[a.rarity] || 0;
-        const scoreB = rarityScore[b.rarity] || 0;
-        return scoreB - scoreA;
+        // Priority C: Sort by Rarity Tier
+        const tierA = rarityScore[cardA.rarity] || 0;
+        const tierB = rarityScore[cardB.rarity] || 0;
+        return tierB - tierA;
     });
 
-    renderChases(sortedCards.slice(0, 5));
-}
+    // 2. DISPLAY THE TOP 5
+    const top5 = sortedCards.slice(0, 5);
 
-// --- 11. PRICE ENGINE: FETCH HIGHEST MARKET VALUE ---
-function getHighestPrice(card) {
-    if (!card.tcgplayer || !card.tcgplayer.prices) return 0;
-    let max = 0;
-    for (const type in card.tcgplayer.prices) {
-        const p = card.tcgplayer.prices[type];
-        const val = p.market || p.mid || p.directLow || p.low || 0;
-        if (val > max) max = val;
-    }
-    return max;
-}
-
-// --- 12. RENDER ENGINE: BUILD CARD UI & STONKS ---
-function renderChases(cards) {
-    const container = document.getElementById('chase-container');
-    container.innerHTML = ''; 
-    
-    cards.forEach(card => {
-        const price = getHighestPrice(card);
-        const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
+    top5.forEach(card => {
+        const price = calculateHighestPrice(card);
+        const priceLabel = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
         const baseNum = card.number.toString().split('/')[0];
 
-        // Smart Link Fallback
-        let tcgUrl = (price === 0 && urlOverrides[baseNum]) ? urlOverrides[baseNum] : 
-                     (card.tcgplayer && card.tcgplayer.url) ? card.tcgplayer.url : 
-                     `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&ProductTypeName=Cards&q=${encodeURIComponent(card.name + ' ' + baseNum)}`;
+        // 3. TCGPlayer Link Failsafe
+        let tcgUrl = '';
+        if (price === 0 && urlOverrides[baseNum]) {
+            tcgUrl = urlOverrides[baseNum];
+        } else if (card.tcgplayer && card.tcgplayer.url) {
+            tcgUrl = card.tcgplayer.url;
+        } else {
+            tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + baseNum)}`;
+        }
+        tcgUrl = tcgUrl.replace(/'/g, "%27");
 
-        tcgUrl = tcgUrl.replace(/'/g, "%27"); // Fix apostrophe bug
-
-        // STONKS LOGIC (LocalStorage Based)
+        // 4. THE STONK ENGINE
         let trendHtml = '';
-        const pastPrice = savedPrices[card.id];
+        const historicPrice = savedPrices[card.id];
 
         if (price > 0) {
-            if (pastPrice > 0) {
-                const diff = price - pastPrice;
+            if (historicPrice > 0) {
+                const diff = price - historicPrice;
                 if (diff > 0) {
                     trendHtml = `<div class="trend-pill trend-up">+$${diff.toFixed(2)} 📈</div>`;
                 } else if (diff < 0) {
@@ -262,78 +268,69 @@ function renderChases(cards) {
             } else {
                 trendHtml = `<div class="trend-pill trend-flat">Baseline 📊</div>`;
             }
-            savedPrices[card.id] = price; // Update DB
+            // Update the persistent "Stonk" database
+            savedPrices[card.id] = price;
         }
 
-        const cardItem = document.createElement('div');
-        cardItem.className = 'card-item';
-        cardItem.innerHTML = `
+        // 5. Build the HTML Node
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card-item';
+        cardDiv.innerHTML = `
             <img class="chase-thumbnail" src="${card.images.small}" onclick="openLightbox('${card.images.large}')">
-            <div class="price-tag" onclick="window.open('${tcgUrl}', '_blank')" title="View on TCGPlayer">${priceString}</div>
+            <div class="price-tag" onclick="window.open('${tcgUrl}', '_blank')">${priceLabel}</div>
             ${trendHtml}
         `;
-        container.appendChild(cardItem);
+        chaseContainer.appendChild(cardDiv);
     });
 
+    // Save Stonks to Disk (LocalStorage)
     localStorage.setItem('pocketPullsPrices', JSON.stringify(savedPrices));
 }
 
-// --- 13. UI CONTROLS: LIGHTBOX & BACK BUTTON ---
+// --- 9. HELPER: CALCULATE PRICE ---
+function calculateHighestPrice(card) {
+    if (!card.tcgplayer || !card.tcgplayer.prices) return 0;
+    let highest = 0;
+    const priceObjects = card.tcgplayer.prices;
+    
+    for (const key in priceObjects) {
+        const p = priceObjects[key];
+        const val = p.market || p.mid || p.directLow || p.low || 0;
+        if (val > highest) highest = val;
+    }
+    return highest;
+}
+
+// --- 10. UI HANDLERS ---
 document.getElementById('back-button').onclick = () => {
     document.getElementById('set-view').classList.add('hidden');
     document.getElementById('home-view').classList.remove('hidden');
-    document.getElementById('current-set-symbol').classList.add('hidden');
 };
 
-function openLightbox(url) { 
-    document.getElementById('lightbox-image').src = url; 
-    document.getElementById('lightbox').style.display = 'flex'; 
+function openLightbox(url) {
+    document.getElementById('lightbox-image').src = url;
+    document.getElementById('lightbox').style.display = 'flex';
 }
 
-function closeLightbox() { 
-    document.getElementById('lightbox').style.display = 'none'; 
+function closeLightbox() {
+    document.getElementById('lightbox').style.display = 'none';
 }
 
-// --- 14. PWA & SETTINGS MODAL LOGIC ---
+// Settings Modal
+document.getElementById('settings-btn').onclick = () => {
+    document.getElementById('settings-modal').style.display = 'flex';
+};
+
+document.getElementById('close-settings').onclick = () => {
+    document.getElementById('settings-modal').style.display = 'none';
+};
+
+// PWA Service Worker Hook
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('SW Registered'))
-            .catch(err => console.log('SW Failed', err));
+        navigator.serviceWorker.register('sw.js');
     });
 }
 
-document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
-document.getElementById('close-settings').onclick = () => document.getElementById('settings-modal').style.display = 'none';
-
-let deferredPrompt;
-const installBtn = document.getElementById('install-btn');
-const iosMsg = document.getElementById('ios-install-msg');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.classList.remove('hidden');
-});
-
-installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') installBtn.classList.add('hidden');
-        deferredPrompt = null;
-    }
-});
-
-const isIos = () => {
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    return /iphone|ipad|ipod/.test(userAgent);
-};
-const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-
-if (isIos() && !isInStandaloneMode()) {
-    iosMsg.classList.remove('hidden');
-}
-
-// Launch the app
+// Boot the App
 loadSets();
