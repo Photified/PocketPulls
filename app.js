@@ -184,12 +184,17 @@ function renderChases(cards) {
     cards.forEach(card => {
         const price = getHighestPrice(card);
         const priceString = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
+        
+        // Extract the TCGPlayer URL. Fallback to '#' if the API doesn't have it.
+        const tcgUrl = card.tcgplayer && card.tcgplayer.url ? card.tcgplayer.url : '#';
 
         const cardItem = document.createElement('div');
         cardItem.className = 'card-item';
+        
+        // Attached the URL via an onclick event to the price tag 
         cardItem.innerHTML = `
             <img class="chase-thumbnail" src="${card.images.small}" onclick="openLightbox('${card.images.large}')">
-            <div class="price-tag">${priceString}</div>
+            <div class="price-tag" onclick="window.open('${tcgUrl}', '_blank')" title="View Live on TCGPlayer">${priceString}</div>
         `;
         container.appendChild(cardItem);
     });
