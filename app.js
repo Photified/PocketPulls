@@ -7,7 +7,7 @@
  */
 
 // --- 1. MANUAL CHASE OVERRIDES ---
-// Explicitly forces high-value cards to the top 5 for specific sets.
+// Explicitly forces high-value cards to the top for specific sets.
 const chaseOverrides = {
     "Ascended Heroes": ["284", "276", "290", "294", "281"], 
     "Perfect Order": ["124", "123", "122", "121", "120"],
@@ -232,12 +232,12 @@ function renderChases(cards, set) {
         return tierB - tierA;
     });
 
-    // 2. DISPLAY THE TOP 5
-    const top5 = sortedCards.slice(0, 5);
+    // 2. DISPLAY THE TOP 10
+    const top10 = sortedCards.slice(0, 10);
 
-    top5.forEach(card => {
+    top10.forEach(card => {
         const price = calculateHighestPrice(card);
-        const priceLabel = price > 0 ? `$${price.toFixed(2)}` : 'Market Pending';
+        const priceLabel = price > 0 ? `$${price.toFixed(2)}` : 'Pending';
         const baseNum = card.number.toString().split('/')[0];
 
         // 3. TCGPlayer Link Failsafe
